@@ -33,6 +33,61 @@ class CoffeeMachinePlayer(arcade.Sprite):
 
         self.spawn_point = (128, 256)
 
+        self.player_frame_time = 0.0
+        self.player_current_frame = 0
+        self.player_frame_duration = 0.1
+        self.player_facing_right = True
+        self.player_is_walking = False
+        self.player_is_jumping = False
+
+    # == Load textures for animation ==
+    def load_player_textures(self):
+        self.player_idle_texture = arcade.load_texture(PLAYER_PATH)
+
+        self.player_walk_textures = []
+        for i in range(1, 7):
+            texture = arcade.load_texture(f"Materials/Sprite/CoffeeMachine/Animation/{i}.png")
+            self.player_walk_textures.append(texture)
+
+        self.player_jump_texture = arcade.load_texture(PLAYER_PATH)
+    
+    # == Animation ==
+    def update_player_animation(self, dt, grounded, moving_x):
+        
+        self.player_frame_time += dt
+        
+        # States
+        self.player_is_walking = grounded and moving_x
+        self.player_is_jumping = not grounded
+        
+        # Player facing
+        if moving_x:
+            if self.change_x > 0:
+                self.player_facing_right = True
+            elif self.change_x < 0:
+                self.player_facing_right = False
+        
+        # == Animation ==
+        if self.player_is_walking:
+            if self.player_frame_time >= self.player_frame_duration:
+                self.player_frame_time = 0
+                self.player_current_frame = (self.player_current_frame + 1) % 6
+
+                if not self.player_facing_right:
+                    self.texture = self.player_walk_textures[self.player_current_frame].flip_left_right()
+                else:
+                    self.texture = self.player_walk_textures[self.player_current_frame]
+        elif self.player_is_jumping:
+            if not self.player_facing_right:
+                self.texture = self.player_jump_texture.flip_left_right()
+            else:
+                self.texture = self.player_jump_texture
+        else:
+            if not self.player_facing_right:
+                self.texture = self.player_idle_texture.flip_left_right()
+            else:
+                self.texture = self.player_idle_texture
+
 
 # == Game ==
 
@@ -47,7 +102,6 @@ class Platformer(arcade.Window):
         self.gui_camera = Camera2D()
 
         # == Sprites ==
-
         self.walls = arcade.SpriteList(use_spatial_hash=True)
         self.platforms = arcade.SpriteList()
 
@@ -75,12 +129,16 @@ class Platformer(arcade.Window):
             batch=self.batch,
         )
 
+    # == Player and Game setup ==
     def setup(self):
-        # == Player ==
         self.player = CoffeeMachinePlayer()
+
         self.player.player_list.clear()
+        
         self.player.center_x, self.player.center_y = self.player.spawn_point
         self.player.player_list.append(self.player)
+
+        self.player.load_player_textures()
 
         # == Test world ==
         for x in range(0, 1600, 64):
@@ -135,14 +193,17 @@ class Platformer(arcade.Window):
                 self.player.change_y *= 0.45
 
     def on_update(self, dt: float):
-
         # == Horizontal moving ==
-
+        
         move = 0
+        moving_x = False
+
         if self.left and not self.right:
             move = -MOVE_SPEED
+            moving_x = True
         elif self.right and not self.left:
             move = MOVE_SPEED
+            moving_x = True
 
         self.player.change_x = move
 
@@ -165,6 +226,8 @@ class Platformer(arcade.Window):
                 self.jump_buffer_timer = 0
 
         self.engine.update()
+
+        self.player.update_player_animation(dt, grounded, moving_x)
 
         target = (self.player.center_x, self.player.center_y)
         cx, cy = self.world_camera.position
