@@ -102,7 +102,7 @@ class Platformer(arcade.Window):
         self.gui_camera = Camera2D()
 
         # == Sprites ==
-        self.walls = arcade.SpriteList(use_spatial_hash=True)
+        self.walls = arcade.SpriteList()
         self.platforms = arcade.SpriteList()
 
         # == Player ==
@@ -131,28 +131,25 @@ class Platformer(arcade.Window):
 
     # == Player and Game setup ==
     def setup(self):
+        # == Player ==
         self.player = CoffeeMachinePlayer()
-
         self.player.player_list.clear()
-        
         self.player.center_x, self.player.center_y = self.player.spawn_point
         self.player.player_list.append(self.player)
-
         self.player.load_player_textures()
 
-        # == Test world ==
-        for x in range(0, 1600, 64):
-            tile = arcade.Sprite(BLOCK_PATH, scale=0.1)
-            tile.center_x = x
-            tile.center_y = 64
-            self.walls.append(tile)
+        # == Load tile map from Tiled ==
+        map_name = "Materials/Sprite/Test.tmx"
+        tile_map = arcade.load_tilemap(map_name, scaling=0.5)
+
+        self.walls = tile_map.sprite_lists["Walls"]
 
         # == Physics ==
         self.engine = arcade.PhysicsEnginePlatformer(
             player_sprite=self.player,
             gravity_constant=GRAVITY,
             walls=self.walls,
-            platforms=self.platforms,
+            platforms=self.platforms
         )
 
         # == Reset physics data ==
