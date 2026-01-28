@@ -22,7 +22,6 @@ WORLD_COLOR = arcade.color.WHITE
 PLAYER_PATH = "Materials/Sprite/CoffeeMachine/standart.png"
 BLOCK_PATH = "Materials/Sprite/Blocks/block.png"
 
-BULLET_PATH = "Materials/Sprite/Bob/bullet.png"
 BULLET_TEXTURES = [
     arcade.load_texture(f"Materials/Sprite/Bob/{i}.png")
     for i in range(1, 8)
@@ -312,16 +311,24 @@ class Platformer(arcade.Window):
 
         self.shoot_timer = SHOOT_COOLDOWN
         
+        offset_x = (self.player.width // 2 + 10) * (1 if self.player.player_facing_right else -1)
+    
+        bullet = Bullet(
+            self.player.center_x + offset_x,
+            self.player.center_y + 8,
+            1 if self.player.player_facing_right else -1
+        )
+        self.bullets.append(bullet)
+    
         effect = ShootEffect(
             self.player.center_x + (1 if self.player.player_facing_right else -1) * (self.player.width // 2),
             self.player.center_y + 16,
             self.player.player_facing_right
         )
-
+        
+        self.shoot_effects.append(effect)
         self.player.start_shoot_animation()
-        self.shot_fired_this_animation = False
-        self.shoot_effects.append(effect)   
-        self.player.start_shoot_animation()
+        self.shot_fired_this_animation = False   
 
     def on_update(self, dt):
         # ===== Timers =====
@@ -374,7 +381,6 @@ class Platformer(arcade.Window):
                     direction
                 )
                 self.bullets.append(bullet)
-                self.shot_fired_this_animation = True
 
 
         # ===== Ground check AFTER physics (for animation) =====
