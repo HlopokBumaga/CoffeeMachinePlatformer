@@ -9,8 +9,8 @@ SCREEN_H = 720
 TITLE = "Coffee Machine Platformer"
 
 GRAVITY = 2
-MOVE_SPEED = 6
-JUMP_SPEED = 20
+MOVE_SPEED = 8
+JUMP_SPEED = 23
 
 COYOTE_TIME = 0.08
 JUMP_BUFFER = 0.12
@@ -20,15 +20,14 @@ CAMERA_LERP = 0.12
 WORLD_COLOR = arcade.color.WHITE
 
 PLAYER_PATH = "Materials/Sprite/CoffeeMachine/standart.png"
-BLOCK_PATH = "Materials/Sprite/Blocks/block.png"
+BOB_PATH = "Materials/Sprite/Bob/CoffeeBob.png"
 
-BULLET_TEXTURES = [
-    arcade.load_texture(f"Materials/Sprite/Bob/{i}.png")
-    for i in range(1, 8)
-]
+JUMP_PATH = "Materials/Sounds/Jump.wav"
+BOB_SOUND_PATH = "Materials/Sounds/CoffeeBean.wav"
+DEAD_PATH = "Materials/Sounds/dead.wav"
+COFFEE_PATH = "Materials/Sounds/Portal.wav"
 
-SHOOT_COOLDOWN = 0.5  
-BULLET_SPEED = 5
+BULLET_SPEED = 6.5
 
 # == Player ==
 
@@ -40,10 +39,7 @@ class CoffeeMachinePlayer(arcade.Sprite):
         self.player_list = arcade.SpriteList()
 
         self.spawn_point = (128, 256)
-        self.player_is_shooting = False
-        self.shoot_current_frame = 0
-        self.shoot_frame_time = 0.0
-        self.shoot_frame_duration = 0.06
+
         self.player_frame_time = 0.0
         self.player_current_frame = 0
         self.player_frame_duration = 0.1
@@ -51,53 +47,21 @@ class CoffeeMachinePlayer(arcade.Sprite):
         self.player_is_walking = False
         self.player_is_jumping = False
 
-        # == Load textures for animation ==
+    # == Load textures for animation ==
     def load_player_textures(self):
         self.player_idle_texture = arcade.load_texture(PLAYER_PATH)
 
-        # === SHOOT animation ===
-        self.player_shoot_textures = [
-            arcade.load_texture(f"Materials/Sprite/Bob/{i}.png")
-            for i in range(1, 8)
-        ]
-
-        # === Walk animation ===
         self.player_walk_textures = [
-        arcade.load_texture(f"Materials/Sprite/CoffeeMachine/Animation/{i}.png")
-        for i in range(1, 7)
+            arcade.load_texture(f"Materials/Sprite/CoffeeMachine/Animation/{i}.png") 
+            for i in range(1, 7)
         ]
 
-        self.player_jump_texture = self.player_idle_texture
-
-        # == Animation Shoot ==
-    def start_shoot_animation(self):
-        self.player_is_shooting = True
-        self.shoot_current_frame = 0
-        self.shoot_frame_time = 0.0
+        self.player_jump_texture = arcade.load_texture(PLAYER_PATH)
     
+    # == Animation ==
     def update_player_animation(self, dt, grounded, moving_x):
         
-        # ===== SHOOT (priority) =====
-        if self.player_is_shooting:
-            self.shoot_frame_time += dt
-
-            if self.shoot_frame_time >= self.shoot_frame_duration:
-                self.shoot_frame_time = 0
-                self.shoot_current_frame += 1
-
-                if self.shoot_current_frame >= len(self.player_shoot_textures):
-                    self.player_is_shooting = False
-                    return
-
-            texture = self.player_shoot_textures[self.shoot_current_frame]
-            if not self.player_facing_right:
-                texture = texture.flip_left_right()
-
-            self.texture = texture
-            return
-        
         self.player_frame_time += dt
-
         
         # States
         self.player_is_walking = grounded and moving_x
@@ -130,94 +94,44 @@ class CoffeeMachinePlayer(arcade.Sprite):
                 self.texture = self.player_idle_texture.flip_left_right()
             else:
                 self.texture = self.player_idle_texture
-        
-
-
-# == Game ==
-
-
-class ShootEffect(arcade.Sprite):
-    def __init__(self, x, y, facing_right):
-        super().__init__(scale=0.1)
-        self.textures = BULLET_TEXTURES
-        self.texture = self.textures[0]
-
-        self.center_x = x
-        self.center_y = y
-
-        self.frame = 0
-        self.time = 0
-        self.frame_duration = 0.05
-        self.facing_right = facing_right
-
-    def update(self, delta_time: float = 1/60):
-        self.time += delta_time
-        if self.time >= self.frame_duration:
-            self.time = 0
-            self.frame += 1
-
-            if self.frame >= len(self.textures):
-                self.remove_from_sprite_lists()
-                return
-
-            tex = self.textures[self.frame]
-            if not self.facing_right:
-                tex = tex.flip_left_right()
-            self.texture = tex
-
-
-
 
 
 class Bullet(arcade.Sprite):
     def __init__(self, x, y, direction):
-        super().__init__(scale=0.07)  
-        self.textures = BULLET_TEXTURES
-        self.texture = self.textures[0]
-
-
+        super().__init__(BOB_PATH, scale=0.05)  
         self.center_x = x
         self.center_y = y
         self.change_x = BULLET_SPEED * direction
 
-        self.frame = 0
-        self.frame_time = 0.0
-        self.frame_duration = 0.06
-
     
-    def update(self, delta_time: float = 1/60):
+    def update(self, dt):
         self.center_x += self.change_x
 
-        self.frame_time += delta_time
-        if self.frame_time >= self.frame_duration:
-            self.frame_time = 0
-            self.frame = (self.frame + 1) % len(self.textures)
-            self.texture = self.textures[self.frame]
+
+# == Game ==
 
 
 class Platformer(arcade.Window):
     def __init__(self):
         super().__init__(SCREEN_W, SCREEN_H, TITLE, antialiasing=True)
         arcade.set_background_color(WORLD_COLOR)
-        # Bullets
-        self.shot_fired_this_animation = False
-        self.shoot_timer = 0.0
-        self.shoot_effects = arcade.SpriteList()
-
 
         # == Cameras ==
         self.world_camera = Camera2D()
         self.gui_camera = Camera2D()
 
         # == Sprites ==
-        self.walls = arcade.SpriteList()
-        self.platforms = arcade.SpriteList()
+        self.walls = None
+
+        self.spikes = None
+
+        self.cups = None
 
         # == Player ==
         self.player = None
-        
-        # == Bullets ==
-        self.bullets = arcade.SpriteList()
+
+        # == Bullet ==
+        self.bullets = None
 
         # == Physics ==
         self.engine = None
@@ -229,19 +143,42 @@ class Platformer(arcade.Window):
         self.jumps_left = MAX_JUMPS
 
         # == Text ==
-        self.score = 0
+        self.cups_taked = 0
+        self.level = 1
         self.batch = Batch()
         self.text_info = arcade.Text(
-            "A, D — ходьба • SPACE — прыжок • F — стрельба",
+            "A, D — ходьба • SPACE — прыжок • F - выстрел",
             16,
             16,
             arcade.color.GRAY,
             14,
             batch=self.batch,
         )
+        self.name_game = arcade.Text(
+            "Coffee Machine Platfromer",
+            16,
+            690,
+            arcade.color.BLACK,
+            20,
+            batch=self.batch,
+        )
+
+        # == Data ==
+        self.deaths = 0
+
+        # == Sound ==
+        self.jump_sound = arcade.load_sound(JUMP_PATH,False)
+        self.bob_sound = arcade.load_sound(BOB_SOUND_PATH,False)
+        self.dead_sound = arcade.load_sound(DEAD_PATH,False)
+        self.coffee_sound = arcade.load_sound(COFFEE_PATH,False)
 
     # == Player and Game setup ==
-    def setup(self):
+    def setup(self, death=False):
+        if death:
+            arcade.play_sound(self.dead_sound,1.0,-1,False)
+
+        self.cups_taked = 0
+
         # == Player ==
         self.player = CoffeeMachinePlayer()
         self.player.player_list.clear()
@@ -250,17 +187,19 @@ class Platformer(arcade.Window):
         self.player.load_player_textures()
 
         # == Load tile map from Tiled ==
-        map_name = "Materials/Sprite/Test.tmx"
+        map_name = "Materials/Sprite/Levels/lvl1.tmx"
         tile_map = arcade.load_tilemap(map_name, scaling=0.5)
 
         self.walls = tile_map.sprite_lists["Walls"]
+        self.spikes = tile_map.sprite_lists["Spikes"]
+        self.cups = tile_map.sprite_lists["CoffeeCups"]
 
         # == Physics ==
         self.engine = arcade.PhysicsEnginePlatformer(
             player_sprite=self.player,
             gravity_constant=GRAVITY,
             walls=self.walls,
-            platforms=self.platforms
+            platforms=None
         )
 
         # == Reset physics data ==
@@ -268,20 +207,58 @@ class Platformer(arcade.Window):
         self.time_since_ground = 999.0
         self.jumps_left = MAX_JUMPS
 
+        self.bullets = arcade.SpriteList()
+
+        # == Texts ==
+        self.cup_info = arcade.Text(
+            f"Наполнено чашек: {self.cups_taked} / 3",
+            16,
+            642,
+            arcade.color.BLACK,
+            16,
+            batch=self.batch,
+        )
+
+        self.level_info = arcade.Text(
+            f"Уровень: {self.level}",
+            16,
+            665,
+            arcade.color.BLACK,
+            17,
+            batch=self.batch,
+        )
+
     def on_draw(self):
         self.clear()
 
         # == World drawing ==
         self.world_camera.use()
+
+        # == Structures ==
         self.walls.draw()
-        self.platforms.draw()
+        self.spikes.draw()
+        self.cups.draw()
+
         self.player.player_list.draw()
+
+        # == Bullets drawing ==
         self.bullets.draw()
-        self.shoot_effects.draw()
 
         # == GUI ==
         self.gui_camera.use()
         self.batch.draw()
+    
+    def shoot(self):   
+        offset_x = (self.player.width // 2 + 10) * (1 if self.player.player_facing_right else -1)
+
+        bullet = Bullet(
+            self.player.center_x + offset_x,
+            self.player.center_y + 8,
+            1 if self.player.player_facing_right else -1
+        )
+
+        self.bullets.append(bullet)
+
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.A:
@@ -291,9 +268,12 @@ class Platformer(arcade.Window):
         elif key == arcade.key.SPACE:
             self.jump_pressed = True
             self.jump_buffer_timer = JUMP_BUFFER
+
+            arcade.play_sound(self.jump_sound,1.0,-1,False)
         elif key == arcade.key.F:
             self.shoot()
 
+            arcade.play_sound(self.bob_sound,1.0,-1,False)
 
     def on_key_release(self, key, modifiers):
         if key == arcade.key.A:
@@ -304,40 +284,20 @@ class Platformer(arcade.Window):
             self.jump_pressed = False
             if self.player.change_y > 0:
                 self.player.change_y *= 0.45
-    
-    def shoot(self):
-        if self.shoot_timer > 0:
-            return
 
-        self.shoot_timer = SHOOT_COOLDOWN
-        
-        offset_x = (self.player.width // 2 + 10) * (1 if self.player.player_facing_right else -1)
-    
-        bullet = Bullet(
-            self.player.center_x + offset_x,
-            self.player.center_y + 8,
-            1 if self.player.player_facing_right else -1
-        )
-        self.bullets.append(bullet)
-    
-        effect = ShootEffect(
-            self.player.center_x + (1 if self.player.player_facing_right else -1) * (self.player.width // 2),
-            self.player.center_y + 16,
-            self.player.player_facing_right
-        )
-        
-        self.shoot_effects.append(effect)
-        self.player.start_shoot_animation()
-        self.shot_fired_this_animation = False   
+    def on_update(self, dt: float):
+        # == Horizontal moving ==
 
-    def on_update(self, dt):
-        # ===== Timers =====
-        if self.shoot_timer > 0:
-            self.shoot_timer -= dt
+        if self.cups_taked == 3:
+            if self.level != 3:
+                self.level += 1
+                self.setup()
+            else:
+                print("Конец игры!")
 
         if self.jump_buffer_timer > 0:
             self.jump_buffer_timer -= dt
-         # ===== Horizontal movement =====
+        
         move = 0
         moving_x = False
 
@@ -348,60 +308,52 @@ class Platformer(arcade.Window):
             move = MOVE_SPEED
             moving_x = True
 
-        self.player.change_x = move 
-        # ===== Jumping =====
-        grounded_before = self.engine.can_jump(y_distance=6)
+        self.player.change_x = move
 
-        if grounded_before:
+        grounded = self.engine.can_jump(y_distance=6)
+
+        if grounded:
             self.time_since_ground = 0
             self.jumps_left = MAX_JUMPS
         else:
             self.time_since_ground += dt
-        
+
         want_jump = self.jump_pressed or (self.jump_buffer_timer > 0)
 
         if want_jump:
             can_coyote = self.time_since_ground <= COYOTE_TIME
-            if grounded_before or can_coyote:
+            if grounded or can_coyote:
                 self.engine.jump(JUMP_SPEED)
                 self.jump_buffer_timer = 0
-        # ===== Physics =====
+
         self.engine.update()
-        
-        # === Fire bullet on shoot frame ===
-        if self.player.player_is_shooting:
-            if (
-                self.player.shoot_current_frame == 2  # 3-й кадр
-                and not self.shot_fired_this_animation
-            ):
-                direction = 1 if self.player.player_facing_right else -1
-                bullet = Bullet(
-                    self.player.center_x + direction * (self.player.width // 2 + 10),
-                    self.player.center_y + 8,
-                    direction
-                )
-                self.bullets.append(bullet)
 
-
-        # ===== Ground check AFTER physics (for animation) =====
-        grounded = self.engine.can_jump(y_distance=6)
-
-        # ===== Bullets =====
         self.bullets.update()
-        
-        # ===== Shoot effects =====
-        self.shoot_effects.update()
+
+        self.player.update_player_animation(dt, grounded, moving_x)
+
+        for cup in self.cups:
+            if arcade.check_for_collision_with_list(cup, self.bullets):
+                cup.remove_from_sprite_lists()
+                self.cups_taked += 1
+                self.cup_info.text = f"Наполнено чашек: {self.cups_taked} / 3"
+                
+                arcade.play_sound(self.coffee_sound,1.0,-1,False)
 
         for bullet in self.bullets:
             if arcade.check_for_collision_with_list(bullet, self.walls):
                 bullet.remove_from_sprite_lists()
+            
+            if arcade.check_for_collision_with_list(bullet, self.cups):
+                bullet.remove_from_sprite_lists()
         
+        for spike in self.spikes:
+            if arcade.check_for_collision(spike, self.player):
+                self.deaths += 1
+                self.setup(True)
 
-        self.player.update_player_animation(dt, grounded, moving_x)
-            # ===== Camera =====
         target = (self.player.center_x, self.player.center_y)
         cx, cy = self.world_camera.position
-
         smooth = (
             cx + (target[0] - cx) * CAMERA_LERP,
             cy + (target[1] - cy) * CAMERA_LERP,
@@ -410,11 +362,11 @@ class Platformer(arcade.Window):
         half_w = self.world_camera.viewport_width / 2
         half_h = self.world_camera.viewport_height / 2
 
-        world_w = 2000
-        world_h = 900
-
+        world_w = 1700
+        world_h = 2000
         cam_x = max(half_w, min(world_w - half_w, smooth[0]))
         cam_y = max(half_h, min(world_h - half_h, smooth[1]))
+
         self.world_camera.position = (cam_x, cam_y)
         self.gui_camera.position = (SCREEN_W / 2, SCREEN_H / 2)
 
