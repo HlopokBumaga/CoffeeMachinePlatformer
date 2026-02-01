@@ -1,6 +1,9 @@
 import arcade
 from arcade.camera import Camera2D
 from pyglet.graphics import Batch
+from datetime import datetime
+import os
+import csv
 
 # == Constants ==
 
@@ -114,7 +117,7 @@ class Bullet(arcade.Sprite):
 class Platformer(arcade.Window):
     def __init__(self):
         super().__init__(SCREEN_W, SCREEN_H, TITLE, antialiasing=True)
-        arcade.set_background_color(WORLD_COLOR)
+        arcade.set_background_color(arcade.color.BLACK)
 
         # == Cameras ==
         self.world_camera = Camera2D()
@@ -144,24 +147,8 @@ class Platformer(arcade.Window):
 
         # == Text ==
         self.cups_taked = 0
-        self.level = 1
+        self.level = 0
         self.batch = Batch()
-        self.text_info = arcade.Text(
-            "A, D — ходьба • SPACE — прыжок • F - выстрел",
-            16,
-            16,
-            arcade.color.GRAY,
-            14,
-            batch=self.batch,
-        )
-        self.name_game = arcade.Text(
-            "Coffee Machine Platfromer",
-            16,
-            690,
-            arcade.color.BLACK,
-            20,
-            batch=self.batch,
-        )
 
         # == Data ==
         self.deaths = 0
@@ -174,78 +161,129 @@ class Platformer(arcade.Window):
 
     # == Player and Game setup ==
     def setup(self, death=False):
-        if death:
-            arcade.play_sound(self.dead_sound,1.0,-1,False)
+        if self.level in (1, 2, 3):
+            arcade.set_background_color(WORLD_COLOR)
 
-        self.cups_taked = 0
+            if death:
+                arcade.play_sound(self.dead_sound,1.0,-1,False)
 
-        # == Player ==
-        self.player = CoffeeMachinePlayer()
-        self.player.player_list.clear()
-        self.player.center_x, self.player.center_y = self.player.spawn_point
-        self.player.player_list.append(self.player)
-        self.player.load_player_textures()
+            self.cups_taked = 0
 
-        # == Load tile map from Tiled ==
-        map_name = "Materials/Sprite/Levels/lvl1.tmx"
-        tile_map = arcade.load_tilemap(map_name, scaling=0.5)
+            # == Player ==
+            self.player = CoffeeMachinePlayer()
+            self.player.player_list.clear()
+            self.player.center_x, self.player.center_y = self.player.spawn_point
+            self.player.player_list.append(self.player)
+            self.player.load_player_textures()
 
-        self.walls = tile_map.sprite_lists["Walls"]
-        self.spikes = tile_map.sprite_lists["Spikes"]
-        self.cups = tile_map.sprite_lists["CoffeeCups"]
+            # == Load tile map from Tiled ==
+            map_name = f"Materials/Sprite/Levels/lvl{self.level}.tmx"
+            tile_map = arcade.load_tilemap(map_name, scaling=0.5)
 
-        # == Physics ==
-        self.engine = arcade.PhysicsEnginePlatformer(
-            player_sprite=self.player,
-            gravity_constant=GRAVITY,
-            walls=self.walls,
-            platforms=None
-        )
+            self.walls = tile_map.sprite_lists["Walls"]
+            self.spikes = tile_map.sprite_lists["Spikes"]
+            self.cups = tile_map.sprite_lists["CoffeeCups"]
 
-        # == Reset physics data ==
-        self.jump_buffer_timer = 0
-        self.time_since_ground = 999.0
-        self.jumps_left = MAX_JUMPS
+            # == Physics ==
+            self.engine = arcade.PhysicsEnginePlatformer(
+                player_sprite=self.player,
+                gravity_constant=GRAVITY,
+                walls=self.walls,
+                platforms=None
+            )
 
-        self.bullets = arcade.SpriteList()
+            # == Reset physics data ==
+            self.jump_buffer_timer = 0
+            self.time_since_ground = 999.0
+            self.jumps_left = MAX_JUMPS
 
-        # == Texts ==
-        self.cup_info = arcade.Text(
-            f"Наполнено чашек: {self.cups_taked} / 3",
-            16,
-            642,
-            arcade.color.BLACK,
-            16,
-            batch=self.batch,
-        )
+            self.bullets = arcade.SpriteList()
 
-        self.level_info = arcade.Text(
-            f"Уровень: {self.level}",
-            16,
-            665,
-            arcade.color.BLACK,
-            17,
-            batch=self.batch,
-        )
+            # == Texts ==
+            self.cup_info = arcade.Text(
+                f"Наполнено чашек: {self.cups_taked} / 3",
+                16,
+                642,
+                arcade.color.BLACK,
+                16,
+                batch=self.batch,
+            )
+
+            self.level_info = arcade.Text(
+                f"Уровень: {self.level}",
+                16,
+                665,
+                arcade.color.BLACK,
+                17,
+                batch=self.batch,
+            )
+            self.text_info = arcade.Text(
+                "A, D — ходьба • SPACE — прыжок • F - выстрел",
+                16,
+                16,
+                arcade.color.GRAY,
+                14,
+                batch=self.batch,
+            )
+            self.name_game = arcade.Text(
+                "Coffee Machine Platfromer",
+                16,
+                690,
+                arcade.color.BLACK,
+                20,
+                batch=self.batch,
+            )
+        elif self.level == 0:
+            self.main_text = arcade.Text("Coffee Machine Platformer", 650, 500,
+                                     arcade.color.WHITE, font_size=40, anchor_x="center", batch=self.batch)
+            
+            self.space_text = arcade.Text("Нажми SPACE, чтобы начать!", 650, 50,
+                                        arcade.color.WHITE, font_size=20, anchor_x="center", batch=self.batch)
+        else:
+            arcade.set_background_color(arcade.color.BLACK)
+
+            del self.text_info
+            del self.cup_info
+            del self.level_info
+            del self.name_game
+
+            self.end_text = arcade.Text("Конец!", 650, 500,
+                                     arcade.color.WHITE, font_size=40, anchor_x="center", batch=self.batch)
+            
+            self.death_text = arcade.Text(f"Смертей: {self.deaths}", 650, 50,
+                                     arcade.color.WHITE, font_size=20, anchor_x="center", batch=self.batch)
+            
+            now = datetime.now()
+            data = [('Date', 'Deaths'), (now.strftime("%d-%m-%Y"), self.deaths)]
+
+            if not (os.path.exists("Logs/log.csv")):
+                with open('Logs/log.csv', 'w', newline='') as f:
+                    csv.writer(f).writerows(data)
+            else:
+                with open('Logs/log.csv', 'a', newline='') as f:
+                    csv.writer(f).writerow(data[1])
+                
 
     def on_draw(self):
         self.clear()
 
-        # == World drawing ==
-        self.world_camera.use()
+        if self.level in (1, 2, 3):
+            # == World drawing ==
+            self.world_camera.use()
 
-        # == Structures ==
-        self.walls.draw()
-        self.spikes.draw()
-        self.cups.draw()
+            # == Structures ==
+            self.walls.draw()
+            self.spikes.draw()
+            self.cups.draw()
 
-        self.player.player_list.draw()
+            self.player.player_list.draw()
 
-        # == Bullets drawing ==
-        self.bullets.draw()
+            # == Bullets drawing ==
+            self.bullets.draw()
 
-        # == GUI ==
-        self.gui_camera.use()
+            # == GUI ==
+            self.gui_camera.use()      
+
         self.batch.draw()
     
     def shoot(self):   
@@ -261,114 +299,123 @@ class Platformer(arcade.Window):
 
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.A:
-            self.left = True
-        elif key == arcade.key.D:
-            self.right = True
-        elif key == arcade.key.SPACE:
-            self.jump_pressed = True
-            self.jump_buffer_timer = JUMP_BUFFER
+        if self.level in (1, 2, 3):
+            if key == arcade.key.A:
+                self.left = True
+            elif key == arcade.key.D:
+                self.right = True
+            elif key == arcade.key.SPACE:
+                self.jump_pressed = True
+                self.jump_buffer_timer = JUMP_BUFFER
 
-            arcade.play_sound(self.jump_sound,1.0,-1,False)
-        elif key == arcade.key.F:
-            self.shoot()
+                arcade.play_sound(self.jump_sound,1.0,-1,False)
+            elif key == arcade.key.F:
+                self.shoot()
 
-            arcade.play_sound(self.bob_sound,1.0,-1,False)
+                arcade.play_sound(self.bob_sound,1.0,-1,False)
+
+        elif self.level == 0:
+            if key == arcade.key.SPACE:
+                self.level += 1
+                arcade.play_sound(self.coffee_sound,1.0,-1,False)
+
+                del self.main_text
+                del self.space_text
+
+                self.setup()
 
     def on_key_release(self, key, modifiers):
-        if key == arcade.key.A:
-            self.left = False
-        elif key == arcade.key.D:
-            self.right = False
-        elif key == arcade.key.SPACE:
-            self.jump_pressed = False
-            if self.player.change_y > 0:
-                self.player.change_y *= 0.45
+        if self.level in (1, 2, 3):
+            if key == arcade.key.A:
+                self.left = False
+            elif key == arcade.key.D:
+                self.right = False
+            elif key == arcade.key.SPACE:
+                self.jump_pressed = False
+                if self.player.change_y > 0:
+                    self.player.change_y *= 0.45
 
     def on_update(self, dt: float):
         # == Horizontal moving ==
-
-        if self.cups_taked == 3:
-            if self.level != 3:
+        if self.level in (1, 2, 3):
+            if self.cups_taked == 3:
                 self.level += 1
                 self.setup()
-            else:
-                print("Конец игры!")
 
-        if self.jump_buffer_timer > 0:
-            self.jump_buffer_timer -= dt
-        
-        move = 0
-        moving_x = False
-
-        if self.left and not self.right:
-            move = -MOVE_SPEED
-            moving_x = True
-        elif self.right and not self.left:
-            move = MOVE_SPEED
-            moving_x = True
-
-        self.player.change_x = move
-
-        grounded = self.engine.can_jump(y_distance=6)
-
-        if grounded:
-            self.time_since_ground = 0
-            self.jumps_left = MAX_JUMPS
-        else:
-            self.time_since_ground += dt
-
-        want_jump = self.jump_pressed or (self.jump_buffer_timer > 0)
-
-        if want_jump:
-            can_coyote = self.time_since_ground <= COYOTE_TIME
-            if grounded or can_coyote:
-                self.engine.jump(JUMP_SPEED)
-                self.jump_buffer_timer = 0
-
-        self.engine.update()
-
-        self.bullets.update()
-
-        self.player.update_player_animation(dt, grounded, moving_x)
-
-        for cup in self.cups:
-            if arcade.check_for_collision_with_list(cup, self.bullets):
-                cup.remove_from_sprite_lists()
-                self.cups_taked += 1
-                self.cup_info.text = f"Наполнено чашек: {self.cups_taked} / 3"
-                
-                arcade.play_sound(self.coffee_sound,1.0,-1,False)
-
-        for bullet in self.bullets:
-            if arcade.check_for_collision_with_list(bullet, self.walls):
-                bullet.remove_from_sprite_lists()
+            if self.jump_buffer_timer > 0:
+                self.jump_buffer_timer -= dt
             
-            if arcade.check_for_collision_with_list(bullet, self.cups):
-                bullet.remove_from_sprite_lists()
-        
-        for spike in self.spikes:
-            if arcade.check_for_collision(spike, self.player):
-                self.deaths += 1
-                self.setup(True)
+            move = 0
+            moving_x = False
 
-        target = (self.player.center_x, self.player.center_y)
-        cx, cy = self.world_camera.position
-        smooth = (
-            cx + (target[0] - cx) * CAMERA_LERP,
-            cy + (target[1] - cy) * CAMERA_LERP,
-        )
+            if self.left and not self.right:
+                move = -MOVE_SPEED
+                moving_x = True
+            elif self.right and not self.left:
+                move = MOVE_SPEED
+                moving_x = True
 
-        half_w = self.world_camera.viewport_width / 2
-        half_h = self.world_camera.viewport_height / 2
+            self.player.change_x = move
 
-        world_w = 1700
-        world_h = 2000
-        cam_x = max(half_w, min(world_w - half_w, smooth[0]))
-        cam_y = max(half_h, min(world_h - half_h, smooth[1]))
+            grounded = self.engine.can_jump(y_distance=6)
 
-        self.world_camera.position = (cam_x, cam_y)
-        self.gui_camera.position = (SCREEN_W / 2, SCREEN_H / 2)
+            if grounded:
+                self.time_since_ground = 0
+                self.jumps_left = MAX_JUMPS
+            else:
+                self.time_since_ground += dt
+
+            want_jump = self.jump_pressed or (self.jump_buffer_timer > 0)
+
+            if want_jump:
+                can_coyote = self.time_since_ground <= COYOTE_TIME
+                if grounded or can_coyote:
+                    self.engine.jump(JUMP_SPEED)
+                    self.jump_buffer_timer = 0
+
+            self.engine.update()
+
+            self.bullets.update()
+
+            self.player.update_player_animation(dt, grounded, moving_x)
+
+            for cup in self.cups:
+                if arcade.check_for_collision_with_list(cup, self.bullets):
+                    cup.remove_from_sprite_lists()
+                    self.cups_taked += 1
+                    self.cup_info.text = f"Наполнено чашек: {self.cups_taked} / 3"
+                    
+                    arcade.play_sound(self.coffee_sound,1.0,-1,False)
+
+            for bullet in self.bullets:
+                if arcade.check_for_collision_with_list(bullet, self.walls):
+                    bullet.remove_from_sprite_lists()
+                
+                if arcade.check_for_collision_with_list(bullet, self.cups):
+                    bullet.remove_from_sprite_lists()
+            
+            for spike in self.spikes:
+                if arcade.check_for_collision(spike, self.player):
+                    self.deaths += 1
+                    self.setup(True)
+
+            target = (self.player.center_x, self.player.center_y)
+            cx, cy = self.world_camera.position
+            smooth = (
+                cx + (target[0] - cx) * CAMERA_LERP,
+                cy + (target[1] - cy) * CAMERA_LERP,
+            )
+
+            half_w = self.world_camera.viewport_width / 2
+            half_h = self.world_camera.viewport_height / 2
+
+            world_w = 1700
+            world_h = 2000
+            cam_x = max(half_w, min(world_w - half_w, smooth[0]))
+            cam_y = max(half_h, min(world_h - half_h, smooth[1]))
+
+            self.world_camera.position = (cam_x, cam_y)
+            self.gui_camera.position = (SCREEN_W / 2, SCREEN_H / 2)
 
 
 def main():
