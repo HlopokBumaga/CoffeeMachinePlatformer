@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="34" height="39" tilewidth="100" tileheight="100" infinite="0" nextlayerid="5" nextobjectid="1">
  <tileset firstgid="1" source="CoffeeMachinePlatformer.tsx"/>
- <tileset firstgid="10" source="../../../../4/Materials/Sprite/Levels/CoffeeMachinePlatformer.tsx"/>
+ <tileset firstgid="10" source="CoffeeMachinePlatformer.tsx"/>
  <layer id="1" name="Walls" width="34" height="39">
   <data encoding="csv">
 536870916,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3758096388,
